@@ -1,0 +1,12 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required:
+      - ouraAccessToken
+    properties:
+      ouraAccessToken:
+        type: string
+        description: Your Oura Ring Personal Access Token from https://cloud.ouraring.com/personal-access-tokens
+  commandFunction: |-
+    config => ({ command: 'uv', args: ['run', '--directory', '.', 'python', '-m', 'oura_mcp_server'], env: { OURA_ACCESS_TOKEN: config.ouraAccessToken } })
