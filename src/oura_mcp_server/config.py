@@ -48,10 +48,25 @@ def load_config() -> Config:
 
 def get_config() -> Config:
     """Get singleton config instance."""
-    global _config_instance
-    if _config_instance is None:
+    global _config_instance, _token_mtime
+    mtime = _current_token_mtime()
+    if _config_instance is None or mtime != _token_mtime:
+        # Reload when the token file changes (e.g. after `oura-mcp-server auth`
+        # in a terminal) so a running server never keeps a stale token.
         _config_instance = load_config()
+        _token_mtime = _current_token_mtime()
     return _config_instance
+
+
+_token_mtime: float | None = None
+
+
+def _current_token_mtime() -> float | None:
+    from oura_mcp_server.auth.oauth import TOKEN_FILE
+    try:
+        return TOKEN_FILE.stat().st_mtime
+    except OSError:
+        return None
 
 
 def reload_config() -> Config:

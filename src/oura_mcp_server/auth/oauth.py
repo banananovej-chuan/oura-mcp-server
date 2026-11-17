@@ -17,8 +17,16 @@ import httpx
 logger = logging.getLogger("oura_mcp_server.auth")
 
 TOKEN_URL = "https://api.ouraring.com/oauth/token"
+# Official endpoint per Oura's OpenAPI spec (securitySchemes.OAuth2).
 AUTHORIZE_URL = "https://cloud.ouraring.com/oauth/authorize"
+# Scopes must be requested explicitly: without them Oura issues a token with
+# no scope claim, and every data endpoint answers 401 ("missing scope claim").
 ALL_SCOPES = "email personal daily heartrate workout tag session spo2"
+
+
+def token_has_scopes(tokens: dict | None) -> bool:
+    """True if the token response carries a non-empty scope."""
+    return bool(tokens and str(tokens.get("scope") or "").strip())
 
 # Token storage
 TOKEN_FILE = Path.home() / ".oura-mcp-tokens.json"
@@ -148,7 +156,6 @@ def run_oauth_flow(client_id: str, client_secret: str) -> bool:
     """
     redirect_uri = _get_redirect_uri()
 
-    # Build authorization URL
     auth_params = urllib.parse.urlencode({
         "response_type": "code",
         "client_id": client_id,
@@ -186,6 +193,15 @@ def run_oauth_flow(client_id: str, client_secret: str) -> bool:
     tokens = exchange_code_for_token(client_id, client_secret, code)
     if not tokens:
         print("Failed to exchange code for tokens.")
+        return False
+
+    if not token_has_scopes(tokens):
+        print(
+            "\nOura issued a token WITHOUT any scopes, so it cannot read data.\n"
+            "Check the app at https://developer.ouraring.com: the data scopes\n"
+            "(daily, heartrate, workout, ...) must be enabled, and leave every\n"
+            "box ticked on the consent page. Then run the auth again."
+        )
         return False
 
     print(f"\nAuthorization successful!")
